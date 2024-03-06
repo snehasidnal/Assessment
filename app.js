@@ -1,79 +1,88 @@
 // app.js
 const express = require('express');
-const https = require('https');
+
+const OpenAI = require("openai");
+
 const app = express();
+
 const port = 3000;
 
-// Middleware to parse JSON bodies
 app.use(express.json());
-app.get('/', (req, res) => {
-    res.send('Hello World!');
-});
 
-// Define a route to handle input and send to OpenAI API
 app.post('/complete_chat', async (req, res) => {
+
     try {
-        // Get user input from request body
+
+        const authHeader = req.headers['authorization'];
+
+        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+
+            return res.status(401).json({
+                error: 'Unauthorized - Bearer token missing'
+            });
+
+        }
+
+        const apiKey1 = authHeader.substring('Bearer '.length);
+
+        const openai = new OpenAI({
+            apiKey: apiKey1
+        });
+
+        console.log(openai);
+
+        if (!req.body.partial_text) {
+
+            return res.status(400).json({
+                error: 'Partial text is required in the request body'
+            });
+
+        }
+
         const partialText = req.body.partial_text;
 
-        // Replace 'YOUR_API_KEY' with your actual OpenAI API key
-        const apiKey = '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';
+        console.log("request", partialText);
 
-        // Data to be sent to the OpenAI API
-        const requestData = JSON.stringify({
-            prompt: partialText,
-            model: 'text-davinci-002', // You can change the model if needed
+        const response = await openai.chat.completions.create({
+
+            model: "gpt-3.5-turbo",
+
+            messages: [{
+                "role": "user",
+                "content": partialText
+            }],
+
+            max_tokens: 100
 
         });
 
-        // Options for the HTTP request
-        const options = {
-            hostname: 'api.openai.com',
-            path: '/v1/completions',
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${apiKey}`,
-                'Content-Type': 'application/json',
-                'Content-Length': requestData.length
-            }
-        };
+        console.log(response);
 
-        // Make the HTTP request to the OpenAI API
-        const request = https.request(options, response => {
-            let data = '';
+        if (!response || !response.data || !response.data.choices || response.data.choices.length === 0) {
 
-            // Receive data from the API
-            response.on('data', chunk => {
-                data += chunk;
+            return res.status(500).json({
+                error: 'Empty or invalid response from OpenAI API'
             });
 
-            // Process the response
-            response.on('end', () => {
-                const responseData = JSON.parse(data);
-                if (responseData. choices && responseData. choices.length > 0){
-                res. json({completed_text: responseData.choices[0].text });
-                } else{
-                res.status(500). json({ error: 'Empty response from OpenAI API' });
-                }
-            });
+        }
+
+        const completedText = response.data.choices[0].message.content;
+
+        res.json({
+            completed_text: completedText
         });
 
-        // Handle any errors
-        request.on('error', error => {
-            console.error('Error:', error.message);
-            res.status(500).json({ error: 'Internal Server Error' });
-        });
-
-        // Send the request data
-        request.write(requestData);
-        request.end();
     } catch (error) {
-        // Handle any errors
-        console.error('Error:', error.message);
-        res.status(500).json({ error: 'Internal Server Error' });
-    }
-});
 
+        console.error('Error:', error.message);
+
+        res.status(500).json({
+            error: 'Internal Server Error'
+        });
+
+    }
+
+});
 // Start server
 app.listen(port, () => {
     console.log(`Server listening at http://localhost:${port}`);
