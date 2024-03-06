@@ -58,7 +58,7 @@ app.post('/complete_chat', async (req, res) => {
 
         console.log(response);
 
-        if (!response || !response.data || !response.data.choices || response.data.choices.length === 0) {
+        if (!response || !response.choices || response.choices.length === 0) {
 
             return res.status(500).json({
                 error: 'Empty or invalid response from OpenAI API'
@@ -66,7 +66,7 @@ app.post('/complete_chat', async (req, res) => {
 
         }
 
-        const completedText = response.data.choices[0].message.content;
+        const completedText = response.choices[0].message.content;
 
         res.json({
             completed_text: completedText
